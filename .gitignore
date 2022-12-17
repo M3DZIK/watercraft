@@ -3,5 +3,6 @@
 /.idea
 
 # assets
+/profiles
 /assets
 /versions
