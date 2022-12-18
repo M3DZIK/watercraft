@@ -7,6 +7,7 @@ mod http_client;
 mod launch;
 
 use clap::Parser;
+use std::process::exit;
 
 #[derive(Parser)]
 #[clap(
@@ -37,11 +38,21 @@ async fn main() {
     let args = Cli::parse();
 
     match args {
-        Cli::Download { version } => download::download(version).await.unwrap(),
+        Cli::Download { version } => {
+            if let Err(e) = download::download(version).await {
+                eprintln!("{red}{error}", red = colors::RED, error = e);
+                exit(1);
+            }
+        }
         Cli::Launch {
             version,
             username,
             java,
-        } => launch::launch(version, username, java).await.unwrap(),
+        } => {
+            if let Err(e) = launch::launch(version, username, java).await {
+                eprintln!("{red}Error: {error}", red = colors::RED, error = e);
+                exit(1);
+            }
+        }
     }
 }

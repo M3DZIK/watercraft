@@ -1,4 +1,6 @@
+use anyhow::anyhow;
 use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 use crate::config::{profile_dir, version_dir, Config};
@@ -7,6 +9,11 @@ pub async fn launch(version: String, username: String, java: Option<String>) -> 
     println!("Launching version {version} as {username} ...");
 
     let version_dir = version_dir!(version);
+
+    // if the version directory doesn't exist, we can't launch it
+    if !Path::new(&version_dir).exists() {
+        return Err(anyhow!("Version {version} does not exist!"));
+    }
 
     // parse config file
     let cfg_file = fs::read_to_string(format!("{version_dir}/config.toml"))?;
