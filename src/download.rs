@@ -1,3 +1,7 @@
+use crate::config::{
+    assets_dir, assets_indexes_dir, assets_objects_dir, libraries_dir, libraries_natives_dir,
+    version_dir, Config,
+};
 use anyhow::anyhow;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
@@ -11,7 +15,12 @@ use crate::http_client::{download_and_extract, download_file, send_http};
 const MAINLINE_VERSIONS: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 const OBJ_SERVER: &str = "https://resources.download.minecraft.net";
 
+#[cfg(target_os = "linux")]
 const OS_NAME: &str = "linux";
+#[cfg(target_os = "windows")]
+const OS_NAME: &str = "windows";
+#[cfg(target_os = "osx")]
+const OS_NAME: &str = "osx";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct VersionManifest {
@@ -151,28 +160,6 @@ struct AssetsIndexObject {
     size: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub version: String,
-    pub assets_root: String,
-    pub auth_uuid: u64,
-    pub auth_access_token: u64,
-    pub clientid: u64,
-    pub auth_xuid: u64,
-    pub version_type: String,
-    pub user_type: String,
-    pub launcher_name: String,
-    pub launcher_version: String,
-    pub main: String,
-    pub assets_index_name: String,
-    pub natives_directory: String,
-    pub log_path: String,
-    pub classpath: Vec<String>,
-    pub java: String,
-    pub jvm_opts: String,
-    pub game_args: String,
-}
-
 pub async fn download(version: String) -> anyhow::Result<()> {
     println!("Downloading version {}", version);
 
@@ -208,21 +195,28 @@ pub async fn download(version: String) -> anyhow::Result<()> {
     // parse the version details
     let version_details = res.json::<VersionDetails>().await?;
 
+    let version_dir = version_dir!(version);
+    let libraries_dir = libraries_dir!(version);
+    let libraries_natives_dir = libraries_natives_dir!(version);
+    let assets_dir = assets_dir!();
+    let assets_indexes_dir = assets_indexes_dir!();
+    let assets_objects_dir = assets_objects_dir!();
+
     // create the version directory
-    fs::create_dir_all(format!("versions/{}", version))?;
+    fs::create_dir_all(&version_dir)?;
 
     // download minecraft client jar
     download_file!(
         version_details.downloads.client.url,
         version_details.downloads.client.size,
-        "versions/{version}/{version}.jar"
+        "{version_dir}/{version}.jar",
     );
 
     // download assets index
     download_file!(
         version_details.asset_index.url,
         version_details.asset_index.size,
-        "assets/indexes/{id}.json",
+        "{assets_indexes_dir}/{id}.json",
         id = version_details.asset_index.id
     );
 
@@ -230,11 +224,9 @@ pub async fn download(version: String) -> anyhow::Result<()> {
     download_file!(
         version_details.logging.client.file.url,
         version_details.logging.client.file.size,
-        "versions/{version}/logging-{id}",
+        "{version_dir}/logging-{id}",
         id = version_details.logging.client.file.id
     );
-
-    let lib_basedir = format!("versions/{version}/libraries");
 
     let mut classpath = vec![];
 
@@ -242,12 +234,17 @@ pub async fn download(version: String) -> anyhow::Result<()> {
     for lib in version_details.libraries {
         // if the library has rules, check if the rules apply to this system
         if lib.rules.is_some() {
-            let mut allowed = "allow".to_string();
+            let mut allowed = "disallow".to_string();
 
             for rule in lib.rules.unwrap() {
-                if rule.os.is_some() && rule.os.unwrap().name == OS_NAME {
-                    allowed = rule.action;
-                    break;
+                match &rule.os {
+                    Some(os) => {
+                        if os.name == OS_NAME {
+                            allowed = rule.action;
+                            break;
+                        }
+                    }
+                    None => allowed = rule.action,
                 }
             }
 
@@ -260,9 +257,14 @@ pub async fn download(version: String) -> anyhow::Result<()> {
         if lib.downloads.artifact.is_some() {
             let lib = lib.downloads.artifact.unwrap();
 
-            download_file!(lib.url, lib.size, "{lib_basedir}/{}", lib.path);
+            download_file!(
+                lib.url,
+                lib.size,
+                "{libraries_dir}/{lib_path}",
+                lib_path = lib.path
+            );
 
-            classpath.push(format!("libraries/{path}", path = lib.path));
+            classpath.push(format!("libraries/{lib_path}", lib_path = lib.path));
         }
 
         // download the library classifiers (natives) if they exist
@@ -280,20 +282,14 @@ pub async fn download(version: String) -> anyhow::Result<()> {
             if artifact.is_some() {
                 let artifact = artifact.unwrap();
 
-                download_and_extract!(
-                    &artifact.url,
-                    artifact.size,
-                    "versions/{version}/{version}-natives"
-                );
+                download_and_extract!(&artifact.url, artifact.size, "{libraries_natives_dir}");
             }
         }
     }
 
-    let obj_basedir = "assets/objects";
-
     // open the assets index file
     let file = File::open(format!(
-        "assets/indexes/{id}.json",
+        "{assets_indexes_dir}/{id}.json",
         id = version_details.asset_index.id
     ))?;
 
@@ -308,7 +304,7 @@ pub async fn download(version: String) -> anyhow::Result<()> {
         download_file!(
             format!("{OBJ_SERVER}/{id}/{hash}", hash = object.hash),
             object.size,
-            "{obj_basedir}/{path}"
+            "{assets_objects_dir}/{path}"
         );
     }
 
@@ -330,7 +326,7 @@ pub async fn download(version: String) -> anyhow::Result<()> {
 
     let config = Config {
         version: version.clone(),
-        assets_root: "../../assets".to_string(),
+        assets_root: assets_dir,
         auth_uuid: 0,
         auth_access_token: 0,
         clientid: 0,
@@ -341,7 +337,7 @@ pub async fn download(version: String) -> anyhow::Result<()> {
         launcher_version: "2.1.1349".to_string(),
         main: version_details.main_class,
         assets_index_name: version_details.asset_index.id.clone(),
-        natives_directory: format!("{version}-natives"),
+        natives_directory: "libraries-natives".to_string(),
         log_path: format!("logging-{id}", id = version_details.logging.client.file.id),
         classpath,
         java: "".to_string(),
@@ -351,7 +347,7 @@ pub async fn download(version: String) -> anyhow::Result<()> {
 
     let config_str = toml::to_string(&config)?;
 
-    let mut config_file = File::create(format!("versions/{version}/{version}-config.toml"))?;
+    let mut config_file = File::create(format!("{version_dir}/config.toml"))?;
     config_file.write_all(config_str.as_bytes())?;
 
     Ok(())

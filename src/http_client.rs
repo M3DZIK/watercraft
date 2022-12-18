@@ -10,7 +10,7 @@ macro_rules! build_request {
             .request($method, $uri)
             .header(
                 "User-Agent",
-                format!("Watercraft/{:?}", env!("CARGO_PKG_VERSION")),
+                format!("Watercraft/{}", env!("CARGO_PKG_VERSION")),
             )
             .build()
     };

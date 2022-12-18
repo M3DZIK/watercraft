@@ -1,6 +1,7 @@
 extern crate core;
 
 mod colors;
+mod config;
 mod download;
 mod http_client;
 mod launch;
@@ -26,8 +27,8 @@ enum Cli {
         version: String,
         #[clap(help = "Username to use")]
         username: String,
-        #[clap(help = "Password to use", long = "java")]
-        java: String,
+        #[clap(help = "Path to java to use", long = "java")]
+        java: Option<String>,
     },
 }
 

@@ -1,21 +1,30 @@
-use crate::download::Config;
 use std::fs;
 use std::process::Command;
 
-pub async fn launch(version: String, username: String, java: String) -> anyhow::Result<()> {
+use crate::config::{profile_dir, version_dir, Config};
+
+pub async fn launch(version: String, username: String, java: Option<String>) -> anyhow::Result<()> {
     println!("Launching version {version} as {username}");
 
-    let cfg_file = fs::read_to_string(format!("versions/{version}/{version}-config.toml"))?;
+    let version_dir = version_dir!(version);
+
+    // parse config file
+    let cfg_file = fs::read_to_string(format!("{version_dir}/config.toml"))?;
     let config: Config = toml::from_str(&cfg_file)?;
 
-    let profile_path = format!("profiles/{username}");
-    fs::create_dir_all(&profile_path)?;
+    // create the profile directory if it doesn't exist
+    let profile_dir = profile_dir!(username);
+    fs::create_dir_all(&profile_dir)?;
 
     let mut cmd = format!(
-        "{} {} {} {}",
-        java, config.jvm_opts, config.main, config.game_args
+        "{java} {jvm_opts} {main} {game_args}",
+        java = java.unwrap_or(config.java),
+        jvm_opts = config.jvm_opts,
+        main = config.main,
+        game_args = config.game_args
     );
 
+    // replace the variables in the command with the correct values from the config file
     cmd = cmd
         .replace("${natives_directory}", &config.natives_directory)
         .replace("${launcher_name}", &config.launcher_name)
@@ -24,7 +33,7 @@ pub async fn launch(version: String, username: String, java: String) -> anyhow::
         .replace("${classpath}", &config.classpath.join(":"))
         .replace("${auth_player_name}", &username)
         .replace("${version_name}", &version)
-        .replace("${game_directory}", &format!("../../{profile_path}"))
+        .replace("${game_directory}", &profile_dir)
         .replace("${assets_root}", &config.assets_root)
         .replace("${assets_index_name}", &config.assets_index_name)
         .replace("${auth_uuid}", &config.auth_uuid.to_string())
@@ -37,25 +46,13 @@ pub async fn launch(version: String, username: String, java: String) -> anyhow::
         .replace("${user_type}", &config.user_type)
         .replace("${version_type}", &config.version_type);
 
-    Command::new("bash")
-        .args(["-c", &cmd])
-        .current_dir(format!("versions/{version}"))
-        .spawn()
-        .expect("failed to run minecraft");
+    let command_vec: Vec<&str> = cmd.split_whitespace().collect();
+
+    Command::new(command_vec[0])
+        .args(&command_vec[1..])
+        .current_dir(version_dir)
+        .spawn()?
+        .wait()?;
 
     Ok(())
 }
-
-// fn create_command(exe: &str, args: Vec<&str>) -> anyhow::Result<Command> {
-//     let mut full_command: Vec<String> = vec![];
-//
-//     full_command.push(exe.to_owned());
-//     for arg in args {
-//         full_command.push(arg.to_owned());
-//     }
-//
-//     let mut command = Command::new(full_command[0].clone());
-//     command.args(full_command[1..full_command.len()].to_vec());
-//
-//     Ok(command)
-// }
