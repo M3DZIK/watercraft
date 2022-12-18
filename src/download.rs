@@ -19,7 +19,7 @@ const OBJ_SERVER: &str = "https://resources.download.minecraft.net";
 const OS_NAME: &str = "linux";
 #[cfg(target_os = "windows")]
 const OS_NAME: &str = "windows";
-#[cfg(target_os = "osx")]
+#[cfg(target_os = "macos")]
 const OS_NAME: &str = "osx";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,7 +161,7 @@ struct AssetsIndexObject {
 }
 
 pub async fn download(version: String) -> anyhow::Result<()> {
-    println!("Downloading version {}", version);
+    println!("Downloading version {version} ...");
 
     // get the version manifest from mojang servers
     let res = send_http!(Method::GET, MAINLINE_VERSIONS).await?;

@@ -4,7 +4,7 @@ use std::process::Command;
 use crate::config::{profile_dir, version_dir, Config};
 
 pub async fn launch(version: String, username: String, java: Option<String>) -> anyhow::Result<()> {
-    println!("Launching version {version} as {username}");
+    println!("Launching version {version} as {username} ...");
 
     let version_dir = version_dir!(version);
 
