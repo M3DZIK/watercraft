@@ -29,8 +29,6 @@ jobs:
             artifact_name: target/x86_64-unknown-linux-musl/release/watercraft
             release_name: x86_64-unknown-linux-musl
             cross: true
-            strip: true
-            compress: true
             cargo_flags: ""
 
           - os: ubuntu-latest
@@ -38,8 +36,6 @@ jobs:
             artifact_name: target/aarch64-unknown-linux-musl/release/watercraft
             release_name: aarch64-unknown-linux-musl
             cross: true
-            strip: false
-            compress: true
             cargo_flags: ""
 
           - os: windows-latest
@@ -47,8 +43,6 @@ jobs:
             artifact_name: target/x86_64-pc-windows-msvc/release/watercraft.exe
             release_name: x86_64-pc-windows-msvc.exe
             cross: false
-            strip: true
-            compress: true
             cargo_flags: ""
 
           - os: macos-latest
@@ -56,8 +50,6 @@ jobs:
             artifact_name: target/x86_64-apple-darwin/release/watercraft
             release_name: x86_64-apple-darwin
             cross: false
-            strip: true
-            compress: true
             cargo_flags: ""
 
           - os: macos-latest
@@ -65,8 +57,6 @@ jobs:
             artifact_name: target/aarch64-apple-darwin/release/watercraft
             release_name: aarch64-apple-darwin
             cross: false
-            strip: true
-            compress: true
             cargo_flags: ""
 
     name: ${{ matrix.os }} for ${{ matrix.target }}
@@ -88,14 +78,6 @@ jobs:
           command: build
           args: --all --release --target=${{ matrix.target }} ${{ matrix.cargo_flags }}
           use-cross: ${{ matrix.cross }}
-
-      - name: Compress binaries
-        uses: svenstaro/upx-action@v2
-        with:
-          file: ${{ matrix.artifact_name }}
-          args: --lzma
-          strip: ${{ matrix.strip }}
-        if: ${{ matrix.compress }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
