@@ -1,6 +1,12 @@
 [package]
 name = "watercraft"
+description = "A Simple Command Line Minecraft Launcher"
 version = "0.1.0"
+license = "BSD-3-Clause"
+authors = ["MedzikUser <medzik@duck.com>"]
+homepage = "https://github.com/MedzikUser/watercraft"
+repository = "https://github.com/MedzikUser/watercraft.git"
+keywords = ["minecraft", "minecraft-launcher"]
 edition = "2021"
 
 [features]
